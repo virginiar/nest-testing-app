@@ -25,4 +25,8 @@ export class CreatePokemonDto {
   @IsArray()
   @IsString({ each: true })
   sprites?: string[];
+
+  // @IsNotEmpty()
+  // @IsString()
+  // anotherRequiredProperty: string;
 }
