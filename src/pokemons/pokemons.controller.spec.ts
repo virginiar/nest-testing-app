@@ -90,11 +90,15 @@ describe('PokemonsController', () => {
       .mockImplementation(() => Promise.resolve('Pokemon updated'));
 
     const id = '1';
-    const dto: UpdatePokemonDto = {};
+    const dto: UpdatePokemonDto = {
+      name: 'My Bulbasaur',
+      type: 'Fire',
+    };
 
-    const result = await controller.update(id, dto);
+    await controller.update(id, dto);
 
-    expect(result).toBe('Pokemon updated');
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(service.update).toHaveBeenCalledWith(+id, dto);
   });
 
   it('should have called delete with the correct id (delete)', async () => {
@@ -107,5 +111,22 @@ describe('PokemonsController', () => {
     const result = await controller.remove(id);
 
     expect(result).toBe('Pokemon deleted');
+  });
+
+  it('should call create service method', async () => {
+    jest
+      .spyOn(service, 'create')
+      .mockImplementation(() => Promise.resolve(mockPokemons[0]));
+
+    await controller.create({
+      name: 'Pikachu',
+      type: 'Electric',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(service.create).toHaveBeenCalledWith({
+      name: 'Pikachu',
+      type: 'Electric',
+    });
   });
 });

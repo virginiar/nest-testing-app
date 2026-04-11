@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { PokemonsService } from './pokemons.service';
+import { UpdatePokemonDto } from './dto/update-pokemon.dto';
 
 describe('PokemonsService', () => {
   let service: PokemonsService;
@@ -23,7 +24,32 @@ describe('PokemonsService', () => {
 
     const result = await service.create(data);
 
-    expect(result).toBe(`This action adds a ${data.name}`);
+    expect(result).toEqual({
+      hp: 0,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      id: expect.any(Number),
+      name: 'Pikachu',
+      sprites: [],
+      type: 'Electric',
+    });
+  });
+
+  it('should throw an error if Pokemon exists', async () => {
+    const data = { name: 'Charmander', type: 'Electric' };
+    await service.create(data);
+
+    // await expect(service.create(data)).rejects.toThrow(BadRequestException);
+    try {
+      await service.create(data);
+      expect(true).toBeFalsy();
+    } catch (error) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      expect(error.message).toBe(
+        `Pokemon with name ${data.name} already exists`,
+      );
+    }
+
   });
 
   it('should return pokemon if exists', async () => {
@@ -69,6 +95,16 @@ describe('PokemonsService', () => {
     );
   });
 
+  it('should return a pokemon from cache', async () => {
+    const cacheSpy = jest.spyOn(service.pokemonsCache, 'get');
+    const id = 1;
+
+    await service.findOne(id);
+    await service.findOne(id);
+
+    expect(cacheSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('should find all pokemons and cache them', async () => {
     const pokemons = await service.findAll({ limit: 10, page: 1 });
 
@@ -77,5 +113,59 @@ describe('PokemonsService', () => {
 
     expect(service.paginatedPokemonsCache.has('10-1')).toBeTruthy();
     expect(service.paginatedPokemonsCache.get('10-1')).toBe(pokemons);
+  });
+
+  it('should return pokemons from cache', async () => {
+    const cacheSpy = jest.spyOn(service.paginatedPokemonsCache, 'get');
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    await service.findAll({ limit: 10, page: 1 });
+    await service.findAll({ limit: 10, page: 1 });
+
+    expect(cacheSpy).toHaveBeenCalledTimes(1);
+    expect(cacheSpy).toHaveBeenCalledWith('10-1');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(11);
+  });
+
+  it('should update pokemon', async () => {
+    const id = 1;
+    const dto: UpdatePokemonDto = { name: 'Charmander 2' };
+
+    const updatedPokemon = await service.update(id, dto);
+
+    expect(updatedPokemon).toEqual({
+      id: 1,
+      name: dto.name,
+      type: 'grass',
+      hp: 45,
+      sprites: [
+        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png',
+        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/1.png',
+      ],
+    });
+  });
+
+  it('should not update pokemon if not exists', async () => {
+    const id = 1_000_000;
+    const dto: UpdatePokemonDto = { name: 'Charmander 2' };
+
+    try {
+      await service.update(id, dto);
+      expect(true).toBeFalsy();
+    } catch (error) {
+      expect(error).toBeInstanceOf(NotFoundException);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      expect(error.message).toBe(`Pokemon with id ${id} not found`);
+    }
+  });
+
+  it('should removed pokemon from caché', async () => {
+    const id = 1;
+    await service.findOne(id);
+
+    await service.remove(id);
+
+    expect(service.pokemonsCache.get(id)).toBeUndefined();
   });
 });
